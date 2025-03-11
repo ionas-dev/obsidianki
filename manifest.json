@@ -3,7 +3,7 @@
 	"name": "Obsidianki",
 	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "Transforms your Obsidian notes falshcards for Anki",
+	"description": "Transforms your Obsidian notes into flashcards for Anki",
 	"author": "Jonas Kaiser",
 	"authorUrl": "https://github.com/ionas-dev",
 	"fundingUrl": "https://github.com/ionas-dev",
