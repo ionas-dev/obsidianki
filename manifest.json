@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
+	"id": "obsidianki",
+	"name": "Obsidianki",
+	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"description": "Transforms your Obsidian notes falshcards for Anki",
+	"author": "Jonas Kaiser",
+	"authorUrl": "https://github.com/ionas-dev",
+	"fundingUrl": "https://github.com/ionas-dev",
+	"isDesktopOnly": true
 }
