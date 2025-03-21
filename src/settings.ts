@@ -2,11 +2,11 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 import Obsidianki from "./main";
 
 export interface Settings {
-    mySetting: string;
+    cardTitleHeadingSeperator: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-    mySetting: 'default'
+    cardTitleHeadingSeperator: ' > '
 }
 
 
@@ -28,9 +28,9 @@ export class SettingTab extends PluginSettingTab {
             .setDesc('It\'s a secret')
             .addText(text => text
                 .setPlaceholder('Enter your secret')
-                .setValue(this.plugin.settings.mySetting)
+                .setValue(this.plugin.settings.cardTitleHeadingSeperator)
                 .onChange(async (value) => {
-                    this.plugin.settings.mySetting = value;
+                    this.plugin.settings.cardTitleHeadingSeperator = value;
                     await this.plugin.saveSettings();
                 }));
     }
