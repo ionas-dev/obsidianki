@@ -2,27 +2,23 @@ import { Editor, MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 import { DEFAULT_SETTINGS, Settings, SettingTab } from './settings';
 import { GENERATE_CARDS_FILE } from './plugin.constants';
 import { assert } from 'console';
-import { Root } from 'mdast'
-import remarkParse from 'remark-parse'
-import { unified } from 'unified'
-
-import remarkRehype from 'remark-rehype'
-import rehypeStringify from 'rehype-stringify';
+import { AnkiParser } from './parsing';
 
 
 export default class Obsidianki extends Plugin {
 	settings: Settings;
+	ankiParser: AnkiParser;
 
 	async onload() {
 		await this.loadSettings();
+		// Threshold should be configurable in the settings
+		this.ankiParser = new AnkiParser(2);
 		this.addSettingTab(new SettingTab(this.app, this));
 		this.addFileMenuItemBy(GENERATE_CARDS_FILE.ID);
 		this.addCommandBy(GENERATE_CARDS_FILE.ID);
 	}
 
-	onunload() {
-
-	}
+	onunload() { }
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -69,66 +65,9 @@ export default class Obsidianki extends Plugin {
 		}
 		new Notice('Generating Anki cards for file ' + file.path);
 		// TODO: When file is opened in editor use vault.cachedRead to get the content
-		const content = await this.app.vault.read(file)
+		const content = await this.app.vault.read(file);
+		const cards = await this.ankiParser.createAnkiCardsFor(content);
 
-		new Notice('Card test');
-
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const modifiedFileForAnki = await unified()
-			.use(remarkParse)
-			.use(parseCards)
-			.use(remarkRehype)
-			.use(rehypeStringify)
-			.process(content);
-
-		new Notice(modifiedFileForAnki.toString());
-	}
-}
-
-function parseCards() {
-	return function (tree: Root) {
-		const header: { [depth: number]: number | undefined } = {};
-		const maxDepth = 6;
-		let cardStart: number | undefined = undefined;
-		let lastLine = 0;
-		/// header indices, card content start index, card content end index (exclusive)
-		const cards: [number[], number, number][] = [];
-
-		tree.children.forEach((node, index) => {
-			lastLine = node.position?.start.line || lastLine;
-			new Notice(node.type + " " + index);
-
-			if (cardStart !== undefined && (node.type === 'heading' || (node.position?.start.line !== undefined && node.position?.start.line > lastLine + 2))) {
-				const cardTitle: number[] = [];
-				for (let i = 1; i < maxDepth; i++) {
-					if (header[i] !== undefined) {
-						cardTitle.push(header[i] as number);
-					}
-				}
-				cards.push([cardTitle, cardStart, index]);
-				cardStart = undefined;
-				new Notice("card end " + index);
-			}
-
-			if (node.type === 'heading') {
-				for (let i = node.depth; i < maxDepth; i++) {
-					header[i] = undefined;
-				}
-				header[node.depth] = index;
-			} else {
-				if (cardStart === undefined) {
-					cardStart = index;
-					new Notice("card start " + cardStart);
-				}
-			}
-		});
-
-
-		cards.forEach(([cardTitle, cardStart, cardEnd]) => {
-			cardTitle.forEach((headerIndex) => {
-				new Notice("header " + headerIndex);
-			});
-			new Notice("card start " + cardStart + " card end " + cardEnd);
-		});
+		new Notice(cards.length + ' Anki cards generated');
 	}
 }
