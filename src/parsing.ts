@@ -10,7 +10,6 @@ import { Root, RootContent } from 'hast'
 import { toHtml } from 'hast-util-to-html'
 import { VFile } from 'vfile';
 
-const maxHeaderDepth = 6;
 
 export class AnkiParser {
     /** Stores the cards as an array of tuples, where each tuple contains the title and content of a card. */
@@ -63,7 +62,7 @@ export class AnkiParser {
             const headerIndices: (number | undefined)[] = [undefined, undefined, undefined, undefined, undefined, undefined];
             let cardStartIndex: number | undefined = undefined;
             let lineOfLastNode = 0;
-            let hasCardTitle = false;
+            let cardHasTitle = false;
 
             tree.children.forEach((node, index) => {
                 const cardHasStarted = () => cardStartIndex !== undefined;
@@ -71,29 +70,23 @@ export class AnkiParser {
                     && (isHTMLHeader(node) || skippedLines(node, lineOfLastNode, this.threshold));
 
                 if (cardHasEnded()) {
-                    const cardTitleTree: RootContent[] = [];
-                    for (let i = 1; i <= maxHeaderDepth; i++) {
-                        const headerIndex = headerIndices[i];
-                        if (headerIndex !== undefined && headerIndex < tree.children.length) {
-                            cardTitleTree.push(tree.children[headerIndex]);
-                        }
-                    }
-
+                    const cardTitleTree = headerIndices
+                        .map(i => (i !== undefined && i < tree.children.length ? tree.children[i] : null))
+                        .filter(Boolean) as RootContent[];
                     const cardContentTree: RootContent[] = tree.children.slice(cardStartIndex, index);
                     cards.push([toHtml(cardTitleTree), toHtml(cardContentTree)]);
 
                     cardStartIndex = undefined;
-                    hasCardTitle = false;
+                    cardHasTitle = false;
                 }
 
                 if (isHTMLHeader(node)) {
                     const nodeDepth = parseInt((node as unknown as Element).tagName[1]);
-                    for (let i = nodeDepth; i <= maxHeaderDepth; i++) {
-                        headerIndices[i] = undefined;
-                    }
+                    headerIndices.fill(undefined, nodeDepth);
                     headerIndices[nodeDepth] = index;
-                    hasCardTitle = true;
-                } else if (hasCardTitle && cardStartIndex === undefined) {
+
+                    cardHasTitle = true;
+                } else if (!cardHasStarted() && cardHasTitle) {
                     cardStartIndex = index;
                 }
 
