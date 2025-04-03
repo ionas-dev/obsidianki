@@ -3,16 +3,20 @@ import { DEFAULT_SETTINGS, Settings, SettingTab } from './settings';
 import { GENERATE_CARDS_FILE } from './plugin.constants';
 import { assert } from 'console';
 import { AnkiParser } from './parsing';
+import { Anki } from './anki';
 
 
 export default class Obsidianki extends Plugin {
 	settings: Settings;
 	ankiParser: AnkiParser;
+	anki: Anki;
 
 	async onload() {
+		console.log('loading the plugin');
 		await this.loadSettings();
 		// Threshold should be configurable in the settings
 		this.ankiParser = new AnkiParser(2);
+		this.anki = new Anki('http://127.0.0.1:8765');
 		this.addSettingTab(new SettingTab(this.app, this));
 		this.addFileMenuItemBy(GENERATE_CARDS_FILE.ID);
 		this.addCommandBy(GENERATE_CARDS_FILE.ID);
@@ -64,10 +68,20 @@ export default class Obsidianki extends Plugin {
 			return;
 		}
 		new Notice('Generating Anki cards for file ' + file.path);
+
 		// TODO: When file is opened in editor use vault.cachedRead to get the content
 		const content = await this.app.vault.read(file);
 		const cards = await this.ankiParser.createAnkiCardsFor(content);
 
 		new Notice(cards.length + ' Anki cards generated');
+		console.log(cards);
+		try {
+			await this.anki.update(cards);
+		} catch (e) {
+			new Notice('Anki cards could not be added to Anki');
+			console.error(e);
+		}
 	}
+
+
 }
