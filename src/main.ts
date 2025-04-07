@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, Settings, SettingTab } from './settings';
 import { GENERATE_CARDS_FILE } from './plugin.constants';
 import { assert } from 'console';
 import { AnkiParser } from './parsing';
-import { Anki } from './anki';
+import { Anki, FetchError } from './anki';
 
 
 export default class Obsidianki extends Plugin {
@@ -77,9 +77,11 @@ export default class Obsidianki extends Plugin {
 		console.log(cards);
 		try {
 			await this.anki.update(cards);
-		} catch (e) {
-			new Notice('Anki cards could not be added to Anki');
-			console.error(e);
+		} catch (error) {
+			if (error instanceof FetchError) {
+				new Notice('Anki is probably not running. Please start Anki and try again.');
+			}
+			console.error(error);
 		}
 	}
 
