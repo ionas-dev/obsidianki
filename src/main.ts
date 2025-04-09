@@ -73,8 +73,7 @@ export default class Obsidianki extends Plugin {
 		const content = await this.app.vault.read(file);
 		const cards = await this.ankiParser.createAnkiCardsFor(content);
 
-		new Notice(cards.length + ' Anki cards generated');
-		console.log(cards);
+		console.log('Parsed cards:', cards);
 		try {
 			await this.anki.update(cards);
 		} catch (error) {
