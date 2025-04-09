@@ -13,47 +13,56 @@ export class Anki {
         // TODO: Include deck name in the card
         const notes = convertToNotesJSON(cards, ['obsidianki', 'obsidianki2', 'obsidianki::subsidianki']);
 
-        let lastErrors = new Set<string>();
-        // TODO: Als erstes canAddNotesWithErrorDetail und dann teil direkt adden und bei anderem teil Fehler behandeln
-        // Fehler können fehlendes Deck sein oder doppelte Notizen die vielleicht aber auch einfach geupdaten werden mïussen wenn das Deck stimmt
-        let response = await this.add(notes);
-        let errors = new Set(response.error);
+        let response = await this.canAddNotes(notes);
 
+        if (response.error !== null) {
+            throw new Error("Something went wrong updating Anki: " + response.error);
+        }
+
+        const cannotAddAllNotes = () => response.result.reduce((previousValue, currentValue) => previousValue || currentValue.canAdd === false, false);
         let i = 0;
-        while (response.error !== null && this.errorsChanged(errors, lastErrors) && i++ < 3) {
-            console.log('while');
-
-            for (const error of errors) {
-                if (this.isErrorOfType(error, ErrorType.DeckNotFound)) {
-                    const deckName = this.getMissingDeckName(error);
+        while (cannotAddAllNotes() && i++ < 3) {
+            const resultsWithIndex: [CanNotAddNotesResult, number][] = response.result
+                .map((result, index) => [result, index] as [CannAddNotesResult, number])
+                .filter(([result, _]) => result.canAdd === false)
+                .map(([result, index]) => [result, index] as [CanNotAddNotesResult, number]);
+            for (const [result, index] of resultsWithIndex) {
+                if (this.isErrorOfType(result.error, ErrorType.DeckNotFound)) {
+                    const deckName = this.getMissingDeckName(result.error);
                     await this.createDeck(deckName);
-                } else if (this.isErrorOfType(error, ErrorType.DuplicateNote)) {
+                } else if (this.isErrorOfType(result.error, ErrorType.DuplicateNote)) {
                     // TODO: Handle duplicate notes
-
+                    console.log('Duplicate note:', notes[index]);
                 }
             }
-
-            lastErrors = errors;
-            response = await this.add(notes);
-            errors = new Set(response.error);
+            response = await this.canAddNotes(notes);
         }
-        if (response.error !== null) {
+
+        if (response.error !== null || cannotAddAllNotes()) {
             throw new Error("Something went wrong updating Anki: " + response.error);
         }
     }
 
+    private async canAddNotes(notes: NoteJSON[]): Promise<CanAddNotesResponse> {
+        console.log('Can add notes request:', notes);
+        const responseBroken = await (await this.post('canAddNotesWithErrorDetail', { notes: notes })).json<CanAddNotesResponseBroken>();
+        const response = fixCanAddNotesReponse(responseBroken);
+        this.log('Can add notes', response);
+        return response;
+    }
+
     private async createDeck(deckName: string): Promise<Response> {
-        console.log('Creating deck:', deckName);
+        console.log('Create deck request:', deckName);
         const response = await (await this.post('createDeck', { deck: deckName })).json<Response>();
-        this.log(response);
+        this.log('Create deck', response);
         return response;
     }
 
     private async add(notes: NoteJSON[]): Promise<NotesResponse> {
-        console.log('Adding notes:', notes);
+        console.log('Add notes request:', notes);
         const responseBroken = await (await this.post('addNotes', { notes: notes })).json<NotesResponseBroken>();
-        const reponse = fixResponse(responseBroken);
-        this.log(reponse);
+        const reponse = fixNotesResponse(responseBroken);
+        this.log('Add notes', reponse);
         return reponse;
     }
 
@@ -62,10 +71,10 @@ export class Anki {
     }
 
     private async findNotes(query: string): Promise<NotesResponse> {
-        console.log('Find notes by quer:', query);
+        console.log('Find notes request:', query);
         const response = await (await this.post('findNotes', { query: query })).json<NotesResponseBroken>();
-        const responseFixed = fixResponse(response);
-        this.log(responseFixed);
+        const responseFixed = fixNotesResponse(response);
+        this.log('Find notes', responseFixed);
         return responseFixed;
     }
 
@@ -88,12 +97,12 @@ export class Anki {
         }
     }
 
-    private log(response: Response) {
+    private log(action: string, response: Response) {
         if (response.error !== null) {
-            console.error('Anki error:', response.error);
+            console.error(action + " error :", response.error);
         }
         if (response.result !== null) {
-            console.log('Anki result:', response.result);
+            console.log(action + " result :", response.result);
         }
     }
 
@@ -147,9 +156,35 @@ interface NotesResponse extends Response {
     error: null | string[]
 }
 
-function fixResponse(notesResponseBroken: NotesResponseBroken): NotesResponse {
+type CanNotAddNotesResult = {
+    canAdd: false,
+    error: string
+}
+
+type CannAddNotesResult = CanNotAddNotesResult | {
+    canAdd: true,
+}
+
+interface CanAddNotesResponseBroken extends Response {
+    result: CannAddNotesResult[],
+    error: null | string
+}
+
+interface CanAddNotesResponse extends Response {
+    result: CannAddNotesResult[],
+    error: null | string[]
+}
+
+function fixNotesResponse(notesResponseBroken: NotesResponseBroken): NotesResponse {
     return {
         result: notesResponseBroken.result,
         error: notesResponseBroken.error === null ? null : JSON.parse(notesResponseBroken.error.replace(/'/g, '"')),
+    }
+}
+
+function fixCanAddNotesReponse(canAddNotesResponseBroken: CanAddNotesResponseBroken): CanAddNotesResponse {
+    return {
+        result: canAddNotesResponseBroken.result,
+        error: canAddNotesResponseBroken.error === null ? null : JSON.parse(canAddNotesResponseBroken.error.replace(/'/g, '"')),
     }
 }
