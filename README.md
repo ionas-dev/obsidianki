@@ -1,94 +1,96 @@
-# Obsidian Sample Plugin
+# Obsidianki
+[![GitHub issues](https://img.shields.io/github/issues/ionas-dev/obsidianki)](https://github.com/ionas-dev/obsidianki/issues)
+[![GitHub stars](https://img.shields.io/github/stars/ionas-dev/obsidianki)](https://github.com/ionas-dev/obsidianki/stargazers)
+[![License](https://img.shields.io/badge/License-0BSD-blue)](LICENSE)
 
-This is a sample plugin for Obsidian (https://obsidian.md).
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+Obsidianki is an Obsidian plugin to manage Anki flashcards, designed with one core principle:  **Write and structure your knowledge in Obsidian naturally** 
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+Yout Obsidian notes are the _single source of truth_ and Obsidianki acts as a tool to generate flashcards from that information, aiding memorization without dictating how you structure your primary notes.
 
-## First time developing plugins?
+## Features
 
-Quick starting guide for new plugin devs:
+* **Header-Based Card Creation:** Use Markdown headers (`#`, `##`, `###`, etc.) to define the front of your Anki cards. Content following headers becomes the back.
+* **Folder-Based Deck Mapping:** The folder structure in your Obsidian vault determines the target Anki deck (e.g., `/Subject/Topic/Note.md` creates cards in the `Subject::Topic` deck).
+* **Multiple Cards per Note:** Generate multiple distinct cards from a single note (see examples).
+* **Obsidian as Single Source of Truth:**
+	* **Add Cards to Anki:** Processes the active note, generates cards, and adds them to Anki.
+	* **Update Cards in Anki:** Processes the active note, recognizes changed card structures, and updates them in Anki.
+	* **Delete Cards in Anki:** Detects removed card structures in the active Obsidian note and handles deletion in Anki.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Requirements
 
-## Releasing new releases
+* **Obsidian:** Latest version recommended.
+* **Anki:** The desktop application must be running.
+* **AnkiConnect:** [AnkiConnect Add-on]([https://git.sr.ht/~foosoft/anki-connect]) must be installed and configured in Anki. Please ensure AnkiConnect is configured to allow connections from Obsidian (check its settings regarding web CORS policies if you encounter issues, often by adding `"http://localhost"` or `"app://obsidian.md"` to the `webCorsOriginList`).
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+## Installation
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### From Obsidian Community Plugins (Recommended)
 
-## Adding your plugin to the community plugin list
+1.  Open Obsidian's **Settings**.
+2.  Go to **Community Plugins**.
+3.  Ensure **Restricted Mode** is **off**.
+4.  Click **Browse** community plugins.
+5.  Search for `Obsidianki`.
+6.  Click **Install**.
+7.  Once installed, click **Enable**.
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## How to Use
 
-## How to use
+The plugin scans your notes for specific header structures to define Anki cards.
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+* **Decks:** The folder path containing the note translates directly into the Anki deck, using `::` as a sub-deck separator. For example, a note at `MyVault/Science/Physics/Kinetics.md` will generate cards in the `Science::Physics` deck in Anki.
+* **Card Front:** The hierarchy of Markdown headers defines the card's front.
+* **Card Back:** The content directly following a header (up until the next header of the same or higher level, or the end of the note) becomes the card's back.
 
-## Manually installing the plugin
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+### Example: Multiple Sub-Headers (Multiple Cards)
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
+Consider this structure in a note named Programming/Python/Basics.md:
+```Markdown
+# Python Basics
 
-## Funding URL
+## Data Types
+Covers integers, floats, strings, booleans, lists, tuples, dictionaries.
+- **int:** Whole numbers (e.g., `10`)
+- **str:** Sequences of characters (e.g., `"Hello"`)
+- **list:** Ordered, mutable sequences (e.g., `[1, 2, 3]`)
 
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+## Control Flow
+How programs make decisions and repeat actions.
+- **if/elif/else:** Conditional execution.
+- **for loop:** Iterating over sequences.
+- **while loop:** Repeating actions based on a condition.
 ```
+Resulting Anki Cards:
+- **Deck:** `Programming::Python`
 
-If you have multiple URLs, you can also do:
+- **Card 1:**
+	- **Front:** `Python Basics > Data Types`
+	- **Back:**
+		```Markdown 
+		Covers integers, floats, strings, booleans, lists, tuples, dictionaries.
+		- **int:** Whole numbers (e.g., `10`)
+		- **str:** Sequences of characters (e.g., `"Hello"`)
+		- **list:** Ordered, mutable sequences (e.g., `[1, 2, 3]`)
+  		```
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+- **Card 2:**
+	- **Front:** `Python Basics > Control Flow`
+	- **Back:**
+ 		```Markdown
+		How programs make decisions and repeat actions.
+		- **if/elif/else:** Conditional execution.
+		- **for loop:** Iterating over sequences.
+		- **while loop:** Repeating actions based on a condition.
+		```
+   
+## Future Plans / Roadmap
+Planned features include:
+- [ ] **Image Support:** Include images from your Obsidian notes on Anki cards.
+- [ ] **LaTeX Support:** Properly render LaTeX (MathJax) formulas on Anki cards.
+- [ ] **Pseudocode (Algorithmicx Package):** Support for pseudocode blocks.
+- [ ] **Manual Card Definitions:** An alternative way to explicitly define cards within your notes using a tag (e.g., #Card)
 
-## API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
+_This Readme was written by Gemini 2.5 Pro (Experimental)_
