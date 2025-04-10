@@ -71,11 +71,26 @@ export default class Obsidianki extends Plugin {
 
 		// TODO: When file is opened in editor use vault.cachedRead to get the content
 		const content = await this.app.vault.read(file);
-		const cards = await this.ankiParser.createAnkiCardsFor(content);
-
+		const cards = await this.ankiParser.parseAnkiCardsFor(content);
 		console.log('Parsed cards:', cards);
+
 		try {
-			await this.anki.update(cards);
+			const deckName = file.path.replace(/\//g, '::').replace(`::${file.name}`, '');
+			const ankiIDs = await this.anki.update(cards.map(card => { return { front: card.front, back: card.back, deckName: deckName, id: card.id } }));
+
+			const lines = content.split('\n');
+
+			let addedLines = 0;
+			cards.forEach((card, index) => {
+				if (card.id === undefined) {
+					lines.splice(card.lastLine + addedLines++, 0, `^${ankiIDs[index]}`);
+				}
+			});
+
+			await this.app.vault.modify(file, lines.join('\n'));
+
+			new Notice(`Updated Anki with ${ankiIDs.length} cards`);
+
 		} catch (error) {
 			if (error instanceof FetchError) {
 				new Notice('Anki is probably not running. Please start Anki and try again.');

@@ -1,10 +1,26 @@
-import { assert } from "console";
 
-export type Card = [string, string];
+export type ParsedCard = {
+    front: string,
+    back: string,
+    firstLine: number,
+    lastLine: number,
+    id?: number
+};
+
+/**
+ * Consists of the front, the back and the name of the deck.
+ */
+export type CardWithDeck = {
+    front: string,
+    back: string,
+    deckName: string,
+    id?: number
+};
 
 export type NoteJSON = {
     deckName: string,
     modelName: string,
+    id?: number,
     fields: {
         Front: string;
         Back: string;
@@ -39,24 +55,24 @@ export type NoteJSON = {
     }[]
 }
 
-export function convertToNotesJSON(cards: Card[], deckNames: string[]): NoteJSON[] {
-    assert(cards.length === deckNames.length, 'Cards and deck names must have the same length');
-    return cards.map((card, index) => convertToNoteJSON(card, deckNames[index]));
+export function convertToNotesJSON(cards: CardWithDeck[]): NoteJSON[] {
+    return cards.map((card) => convertToNoteJSON(card));
 }
 
-export function convertToNoteJSON(card: Card, deckName: string): NoteJSON {
+export function convertToNoteJSON(card: CardWithDeck): NoteJSON {
     return {
-        deckName: deckName,
+        deckName: card.deckName,
         modelName: 'Basic',
+        id: card.id,
         fields: {
-            Front: card[0],
-            Back: card[1]
+            Front: card.front,
+            Back: card.back
         },
         options: {
             allowDuplicate: false,
             duplicateScope: 'deck',
             duplicateScopeOptions: {
-                deckName: deckName,
+                deckName: card.deckName,
                 checkChildren: false,
                 checkAllModels: false
             }

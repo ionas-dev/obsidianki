@@ -1,6 +1,6 @@
 import ky, { KyResponse } from "ky";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Card, convertToNotesJSON, NoteJSON } from "./card";
+import { CardWithDeck, convertToNoteJSON, convertToNotesJSON, NoteJSON } from "./card";
 export class Anki {
 
     readonly ipAddress: string;
@@ -9,61 +9,114 @@ export class Anki {
         this.ipAddress = ipAddress;
     }
 
-    public async update(cards: Card[]) {
-        // TODO: Include deck name in the card
-        const notes = convertToNotesJSON(cards, ['obsidianki', 'obsidianki2', 'obsidianki::subsidianki']);
+    public async update(cards: CardWithDeck[]): Promise<number[]> {
+        console.log('Update Anki with Cards:', cards);
 
-        let response = await this.canAddNotes(notes);
-
-        if (response.error !== null) {
-            throw new Error("Something went wrong updating Anki: " + response.error);
+        const existingCards = cards.filter(card => card.id !== undefined);
+        const existingNotes = [];
+        for (const card of existingCards) {
+            existingNotes.push(await this.updateRequest(convertToNoteJSON(card)));
         }
 
-        const cannotAddAllNotes = () => response.result.reduce((previousValue, currentValue) => previousValue || currentValue.canAdd === false, false);
-        let i = 0;
-        while (cannotAddAllNotes() && i++ < 3) {
-            const resultsWithIndex: [CanNotAddNotesResult, number][] = response.result
-                .map((result, index) => [result, index] as [CannAddNotesResult, number])
-                .filter(([result, _]) => result.canAdd === false)
-                .map(([result, index]) => [result, index] as [CanNotAddNotesResult, number]);
-            for (const [result, index] of resultsWithIndex) {
-                if (this.isErrorOfType(result.error, ErrorType.DeckNotFound)) {
-                    const deckName = this.getMissingDeckName(result.error);
-                    await this.createDeck(deckName);
-                } else if (this.isErrorOfType(result.error, ErrorType.DuplicateNote)) {
-                    // TODO: Handle duplicate notes
-                    console.log('Duplicate note:', notes[index]);
-                }
+        let addedNotes: number[] = [];
+        const newCards = cards.filter(card => card.id === undefined);
+        if (newCards.length > 0) {
+            addedNotes = await this.add(newCards);
+        }
+
+        const noteIDs: number[] = [];
+        for (let i = 0, j = 0; i < existingNotes.length || j < addedNotes.length;) {
+            if (cards[i + j].id !== undefined) {
+                noteIDs.push(cards[i + j].id as number);
+                i += 1;
+            } else {
+                noteIDs.push(addedNotes[j]);
+                j += 1;
             }
-            response = await this.canAddNotes(notes);
         }
 
-        if (response.error !== null || cannotAddAllNotes()) {
-            throw new Error("Something went wrong updating Anki: " + response.error);
-        }
+        console.log('Update Anki Result:', noteIDs);
+        return noteIDs;
     }
 
-    private async canAddNotes(notes: NoteJSON[]): Promise<CanAddNotesResponse> {
+    private async add(cards: CardWithDeck[]): Promise<number[]> {
+        const notes = convertToNotesJSON(cards);
+        let results = await this.canAddNotesRequest(notes);
+
+        const cannotAddAllNotes = () => results.reduce((previousValue, currentValue) => previousValue || currentValue.canAdd === false, false);
+        let i = 0;
+        while (cannotAddAllNotes() && i++ < 3) {
+            const notHandledErrors = (await Promise.all(results
+                .map((result, index) => [result, index] as [CanAddNotesResult, number])
+                .filter(([result,]) => result.canAdd === false)
+                .map(([result, index]) => [(result as CanNotAddNotesResult).error, notes[index]] as [string, NoteJSON])
+                .map(async ([error, note]) => await this.handleError(error, note))))
+                .filter((result) => (result) !== undefined);
+
+            if (notHandledErrors.length > 0) {
+                throw new Error('Some errors could not be handled: ' + notHandledErrors);
+            }
+
+            results = await this.canAddNotesRequest(notes);
+        }
+
+        // TODO: In Zukunft teilweise adden
+        if (cannotAddAllNotes()) {
+            console.error('Cannot add all notes:', results);
+            throw new Error('Cannot add all notes:' + results.filter(result => !result.canAdd).map((result) => result.error));
+        }
+
+        return this.addRequest(notes);
+    }
+
+    // TODO : Doppelte Fehler bahndlung unnötig
+    private async handleError(error: string, note: NoteJSON): Promise<string | undefined> {
+        if (this.isErrorOfType(error, ErrorType.DeckNotFound)) {
+            const deckName = this.getMissingDeckName(error);
+            await this.createDeckRequest(deckName);
+        } else if (this.isErrorOfType(error, ErrorType.DuplicateNote)) {
+            // TODO: Handle duplicate notes
+            console.log('Duplicate note:', note);
+        }
+        return undefined;
+    }
+
+    private async canAddNotesRequest(notes: NoteJSON[]): Promise<CanAddNotesResult[]> {
         console.log('Can add notes request:', notes);
         const responseBroken = await (await this.post('canAddNotesWithErrorDetail', { notes: notes })).json<CanAddNotesResponseBroken>();
         const response = fixCanAddNotesReponse(responseBroken);
         this.log('Can add notes', response);
-        return response;
+
+        if (response.error !== null) {
+            throw new Error("Something went wrong checking if notes can be added: " + response.error);
+        }
+
+        return response.result;
     }
 
-    private async createDeck(deckName: string): Promise<Response> {
+    private async createDeckRequest(deckName: string): Promise<Response> {
         console.log('Create deck request:', deckName);
         const response = await (await this.post('createDeck', { deck: deckName })).json<Response>();
         this.log('Create deck', response);
         return response;
     }
 
-    private async add(notes: NoteJSON[]): Promise<NotesResponse> {
+    private async updateRequest(note: NoteJSON): Promise<NoteResponse> {
+        console.log('Update note model request:', note);
+        const response = await (await this.post('updateNoteModel', { note: note })).json<NoteResponse>();
+        this.log('Update notes', response);
+        return response;
+    }
+
+    private async addRequest(notes: NoteJSON[]): Promise<number[]> {
         console.log('Add notes request:', notes);
         const responseBroken = await (await this.post('addNotes', { notes: notes })).json<NotesResponseBroken>();
-        const reponse = fixNotesResponse(responseBroken);
-        this.log('Add notes', reponse);
-        return reponse;
+        const response = fixNotesResponse(responseBroken);
+        this.log('Add notes', response);
+        if (response.error !== null || response.result === null) {
+            throw new Error("Something went wrong adding notes: " + response.error);
+        }
+        return response.result as number[];
     }
 
     private async findNotesWithExactFront(query: string): Promise<Response> {
@@ -130,7 +183,7 @@ export class Anki {
     }
 }
 
-enum ErrorType {
+const enum ErrorType {
     DeckNotFound = 'deck was not found: ',
     DuplicateNote = 'cannot create note because it is a duplicate',
     FailedToFetch = 'Failed to fetch'
@@ -147,6 +200,12 @@ interface Response {
     error: null | unknown
 }
 
+interface NoteResponse extends Response {
+    result: null | string
+    error: null | string
+}
+
+
 interface NotesResponseBroken extends Response {
     result: null | number[],
     error: null | string
@@ -161,17 +220,17 @@ type CanNotAddNotesResult = {
     error: string
 }
 
-type CannAddNotesResult = CanNotAddNotesResult | {
+type CanAddNotesResult = CanNotAddNotesResult | {
     canAdd: true,
 }
 
 interface CanAddNotesResponseBroken extends Response {
-    result: CannAddNotesResult[],
+    result: CanAddNotesResult[],
     error: null | string
 }
 
 interface CanAddNotesResponse extends Response {
-    result: CannAddNotesResult[],
+    result: CanAddNotesResult[],
     error: null | string[]
 }
 
