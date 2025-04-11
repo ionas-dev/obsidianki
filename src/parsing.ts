@@ -1,6 +1,4 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Notice } from 'obsidian';
-
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import rehypeStringify from 'rehype-stringify';

@@ -13,25 +13,17 @@ export class Anki {
         console.log('Update Anki with Cards:', cards);
 
         const existingCards = cards.filter(card => card.id !== undefined);
-        const existingNotes = [];
-        for (const card of existingCards) {
-            existingNotes.push(await this.updateRequest(convertToNoteJSON(card)));
-        }
+        const updatedNotes = await Promise.all(existingCards.map((card) => convertToNoteJSON(card)).map(async (note) => await this.updateRequest(note)));
 
-        let addedNotes: number[] = [];
         const newCards = cards.filter(card => card.id === undefined);
-        if (newCards.length > 0) {
-            addedNotes = await this.add(newCards);
-        }
+        const addedNotes = await this.add(newCards);
 
         const noteIDs: number[] = [];
-        for (let i = 0, j = 0; i < existingNotes.length || j < addedNotes.length;) {
-            if (cards[i + j].id !== undefined) {
-                noteIDs.push(cards[i + j].id as number);
-                i += 1;
+        for (let i = 0; i < updatedNotes.length + addedNotes.length; i++) {
+            if (cards[i].id !== undefined) {
+                noteIDs[i] = cards[i].id as number;
             } else {
-                noteIDs.push(addedNotes[j]);
-                j += 1;
+                noteIDs[i] = addedNotes[i - updatedNotes.length];
             }
         }
 
@@ -40,6 +32,9 @@ export class Anki {
     }
 
     private async add(cards: CardWithDeck[]): Promise<number[]> {
+        if (cards.length === 0) {
+            return [];
+        }
         const notes = convertToNotesJSON(cards);
         let results = await this.canAddNotesRequest(notes);
 
@@ -60,7 +55,7 @@ export class Anki {
             results = await this.canAddNotesRequest(notes);
         }
 
-        // TODO: In Zukunft teilweise adden
+        // TODO: In Zukunft auch teilweise adden
         if (cannotAddAllNotes()) {
             console.error('Cannot add all notes:', results);
             throw new Error('Cannot add all notes:' + results.filter(result => !result.canAdd).map((result) => result.error));
@@ -69,7 +64,7 @@ export class Anki {
         return this.addRequest(notes);
     }
 
-    // TODO : Doppelte Fehler bahndlung unnötig
+    // TODO : Doppelte Fehler Behandlung unnötig
     private async handleError(error: string, note: NoteJSON): Promise<string | undefined> {
         if (this.isErrorOfType(error, ErrorType.DeckNotFound)) {
             const deckName = this.getMissingDeckName(error);
